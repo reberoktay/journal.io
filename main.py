@@ -4,6 +4,7 @@ import requests
 
 app = Flask(__name__)
 
+# Lade Umgebungsvariablen von Render
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 
@@ -26,7 +27,9 @@ def save_entry():
         "properties": {
             "Titel": {
                 "title": [{
-                    "text": { "content": "GPT Journal Entry" }
+                    "text": {
+                        "content": "GPT Journal Entry"
+                    }
                 }]
             }
         },
@@ -36,17 +39,21 @@ def save_entry():
             "paragraph": {
                 "rich_text": [{
                     "type": "text",
-                    "text": { "content": text }
+                    "text": {
+                        "content": text
+                    }
                 }]
             }
         }]
     }
 
     response = requests.post("https://api.notion.com/v1/pages", headers=headers, json=payload)
+
     if response.status_code in [200, 201]:
         return jsonify({"message": "Saved to Notion!"}), 200
     else:
-        return jsonify({"error": "Failed", "details": response.text}), 500
+        # Nur kleine Fehlerantwort – damit GPT nicht überlastet wird
+        return jsonify({"error": "Failed"}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
