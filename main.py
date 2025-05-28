@@ -4,13 +4,15 @@ import requests
 
 app = Flask(__name__)
 
+# Umgebungsvariablen laden
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 
-# 🔄 Neue Route: Beliebig viele Einträge aus Notion abrufen
+# 📥 Route: Letzte X Journal-Einträge abrufen
 @app.route("/read_entries", methods=["GET"])
 def read_entries():
-    limit = int(request.args.get("limit", 5))  # Default = 5
+    limit = int(request.args.get("limit", 5))  # Standard: 5
+
     headers = {
         "Authorization": f"Bearer {NOTION_API_KEY}",
         "Notion-Version": "2022-06-28",
@@ -21,38 +23,38 @@ def read_entries():
         "page_size": limit,
         "sorts": [
             {
-                "property": "Created time",
+                "timestamp": "created_time",  # Sicheres Sortierfeld
                 "direction": "descending"
             }
         ]
     }
 
-    response = requests.post(
-        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
-        headers=headers,
-        json=payload
-    )
+    url = f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query"
+    response = requests.post(url, headers=headers, json=payload)
 
     if response.status_code != 200:
-        return jsonify({"error": "Failed to query Notion"}), 500
+        return jsonify({"error": "Failed to query Notion", "details": response.text}), 500
 
     results = response.json().get("results", [])
     entries = []
 
     for result in results:
-        content = []
-        if "properties" in result:
-            props = result["properties"]
-            for prop in props.values():
-                if prop.get("type") == "rich_text":
-                    for r in prop["rich_text"]:
-                        content.append(r.get("plain_text", ""))
-        entries.append(" ".join(content).strip())
+        text_parts = []
+
+        for prop_name, prop in result.get("properties", {}).items():
+            if prop.get("type") == "rich_text":
+                for rt in prop.get("rich_text", []):
+                    if rt.get("type") == "text":
+                        text_parts.append(rt["text"].get("content", ""))
+
+        full_text = " ".join(text_parts).strip()
+        if full_text:
+            entries.append(full_text)
 
     return jsonify({"entries": entries}), 200
 
 
-# ✅ Bestehende Route: GPT-Eintrag in Notion speichern
+# ✅ Route: GPT-Tagebucheintrag speichern
 @app.route("/save", methods=["POST"])
 def save_entry():
     data = request.get_json()
@@ -97,8 +99,9 @@ def save_entry():
     if response.status_code in [200, 201]:
         return jsonify({"message": "Saved to Notion!"}), 200
     else:
-        return jsonify({"error": "Failed"}), 500
+        return jsonify({"error": "Failed", "details": response.text}), 500
 
 
+# ▶️ Server starten
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
