@@ -88,20 +88,21 @@ def read_entries():
         )
 
         if blocks_response.status_code != 200:
+            full_entries.append("(Fehler beim Laden dieses Eintrags)")
             continue
 
         blocks = blocks_response.json().get("results", [])
         entry_text = []
 
         for block in blocks:
-            rich_text = block.get(block["type"], {}).get("rich_text", [])
-            for t in rich_text:
-                entry_text.append(t.get("plain_text", ""))
+            block_type = block.get("type")
+            if not block_type:
+                continue
+            rich_texts = block.get(block_type, {}).get("rich_text", [])
+            for r in rich_texts:
+                entry_text.append(r.get("plain_text", ""))
 
-        if entry_text:
-            full_entries.append("\n".join(entry_text).strip())
-        else:
-            full_entries.append("(Kein Inhalt gefunden)")
+        full_entries.append("\n".join(entry_text).strip() or "(Kein Inhalt)")
 
     return jsonify({"entries": full_entries}), 200
 
