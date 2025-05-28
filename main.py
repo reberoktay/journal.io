@@ -13,7 +13,6 @@ NOTION_HEADERS = {
     "Notion-Version": "2022-06-28"
 }
 
-# ✅ Speichert GPT-Text in Notion
 @app.route("/save", methods=["POST"])
 def save_entry():
     data = request.get_json()
@@ -54,8 +53,6 @@ def save_entry():
     else:
         return jsonify({"error": "Failed to save"}), 500
 
-
-# 🔄 Holt die letzten X Einträge mit vollständigem Inhalt
 @app.route("/read_entries", methods=["GET"])
 def read_entries():
     try:
@@ -86,7 +83,7 @@ def read_entries():
     for page in pages:
         page_id = page["id"]
         blocks_response = requests.get(
-            f"https://api.notion.com/v1/blocks/{page_id}/children",
+            f"https://api.notion.com/v1/blocks/{page_id}/children?page_size=100",
             headers=NOTION_HEADERS
         )
 
@@ -97,15 +94,16 @@ def read_entries():
         entry_text = []
 
         for block in blocks:
-            if block.get("type") == "paragraph":
-                texts = block["paragraph"].get("rich_text", [])
-                for t in texts:
-                    entry_text.append(t.get("plain_text", ""))
+            rich_text = block.get(block["type"], {}).get("rich_text", [])
+            for t in rich_text:
+                entry_text.append(t.get("plain_text", ""))
 
-        full_entries.append("\n".join(entry_text).strip())
+        if entry_text:
+            full_entries.append("\n".join(entry_text).strip())
+        else:
+            full_entries.append("(Kein Inhalt gefunden)")
 
     return jsonify({"entries": full_entries}), 200
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
