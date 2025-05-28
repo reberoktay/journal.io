@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: journalio
+    env: python
+    buildCommand: ""
+    startCommand: "python main.py"
+    plan: free
+    envVars:
+      - key: NOTION_API_KEY
+        sync: false
+      - key: NOTION_DATABASE_ID
+        sync: false
