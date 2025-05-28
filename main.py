@@ -82,7 +82,8 @@ def read_entries():
     entries = []
     for result in response.json().get("results", []):
         title = result["properties"]["Titel"]["title"][0]["text"]["content"] if result["properties"]["Titel"]["title"] else "Kein Titel"
-        date = result["properties"]["Datum"]["date"]["start"] if "Datum" in result["properties"] else "Kein Datum"
+        datum_property = result["properties"].get("Datum", {})
+        date_value = datum_property.get("rich_text", [{}])[0].get("plain_text", "Kein Datum") if datum_property.get("type") == "rich_text" else "Kein Datum"
         content = ""
 
         # Lese Inhalt aus dem ersten Paragraph-Block
