@@ -24,7 +24,7 @@ def save_entry():
     payload = {
         "parent": { "database_id": NOTION_DATABASE_ID },
         "properties": {
-            "Name": {
+            "Titel": {
                 "title": [{
                     "text": { "content": "GPT Journal Entry" }
                 }]
