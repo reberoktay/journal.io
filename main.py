@@ -27,10 +27,19 @@ def save_entry():
 
     payload = {
         "parent": {"database_id": NOTION_DATABASE_ID},
+        # Dynamischer Titel: z. B. erster Satz des Eintrags
+        title_text = text.split(".")[0][:50]  # Max. 50 Zeichen
+        
         "properties": {
             "Titel": {
                 "title": [{
-                    "text": {"content": "GPT Journal Entry"}
+                    "text": {
+                        "content": title_text
+                    }
+                }]
+            }
+        },
+
                 }]
             },
             "Datum": {
