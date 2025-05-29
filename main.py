@@ -20,7 +20,7 @@ def save_entry():
         return jsonify({"error": "No text provided"}), 400
 
     # 📌 Titel dynamisch aus dem ersten Satz (max. 50 Zeichen)
-    title_text = text.strip().split(".")[0][:50]
+    title_text = text.strip().split(".")[0][:20]
 
     headers = {
         "Authorization": f"Bearer {NOTION_API_KEY}",
