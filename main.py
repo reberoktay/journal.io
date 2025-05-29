@@ -7,10 +7,10 @@ app = Flask(__name__)
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 
-# === Einträge flexibel lesen ===
+# --------- Flexible: Journal-Einträge lesen ---------
 @app.route("/read_entries", methods=["GET"])
 def read_entries():
-    limit = int(request.args.get("limit", 5))  # Default = 5
+    limit = int(request.args.get("limit", 5))  # Standard: 5 Einträge
     headers = {
         "Authorization": f"Bearer {NOTION_API_KEY}",
         "Notion-Version": "2022-06-28",
@@ -33,7 +33,6 @@ def read_entries():
         json=payload
     )
 
-    # Debugging: Gib Status und Inhalt der Notion-Antwort aus!
     print("NOTION RESPONSE STATUS:", response.status_code)
     print("NOTION RESPONSE TEXT:", response.text)
 
@@ -44,26 +43,26 @@ def read_entries():
     entries = []
 
     for result in results:
-        entry = {}
-        # Titel, Datum und Bewertung abrufen, falls vorhanden:
         props = result.get("properties", {})
-        # Titel
-        title_data = props.get("Titel", {}).get("title", [])
-        entry["title"] = title_data[0]["plain_text"] if title_data else ""
-        # Datum
-        date_data = props.get("Datum", {}).get("date", {})
-        entry["date"] = date_data.get("start", "")
-        # Bewertung
-        rating_data = props.get("Bewertung", {}).get("number", None)
-        entry["rating"] = rating_data if rating_data is not None else ""
-        # Optional: KI-Zusammenfassung, falls du sie als property hast:
-        summary_data = props.get("KI-Zusammenfassung", {}).get("rich_text", [])
-        entry["summary"] = summary_data[0]["plain_text"] if summary_data else ""
+        entry = {}
+
+        # Lese alle Felder mit type rich_text (egal wie sie heißen)
+        for field_name, prop in props.items():
+            if prop.get("type") == "rich_text":
+                texts = [r.get("plain_text", "") for r in prop["rich_text"]]
+                entry[field_name] = " ".join(texts).strip()
+            elif prop.get("type") == "title":
+                texts = [r.get("plain_text", "") for r in prop["title"]]
+                entry[field_name] = " ".join(texts).strip()
+            elif prop.get("type") == "number":
+                entry[field_name] = prop.get("number")
+            elif prop.get("type") == "date":
+                entry[field_name] = prop["date"]["start"] if prop.get("date") else ""
         entries.append(entry)
 
     return jsonify({"entries": entries}), 200
 
-# === Eintrag speichern ===
+# --------- Journal-Eintrag speichern ---------
 @app.route("/save", methods=["POST"])
 def save_entry():
     data = request.get_json()
@@ -103,9 +102,14 @@ def save_entry():
         }]
     }
 
-    response = requests.post("https://api.notion.com/v1/pages", headers=headers, json=payload)
-    print("NOTION SAVE RESPONSE STATUS:", response.status_code)
-    print("NOTION SAVE RESPONSE TEXT:", response.text)
+    response = requests.post(
+        "https://api.notion.com/v1/pages",
+        headers=headers,
+        json=payload
+    )
+
+    print("SAVE TO NOTION STATUS:", response.status_code)
+    print("SAVE TO NOTION RESPONSE:", response.text)
 
     if response.status_code in [200, 201]:
         return jsonify({"message": "Saved to Notion!"}), 200
