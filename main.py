@@ -19,7 +19,7 @@ def save_entry():
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
-    # 📌 Titel dynamisch aus dem ersten Satz (max. 50 Zeichen)
+    # 📌 Titel dynamisch aus dem ersten Satz (max. 20 Zeichen)
     title_text = text.strip().split(".")[0][:20]
 
     headers = {
