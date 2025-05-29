@@ -19,10 +19,8 @@ def save_entry():
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
-    # Dynamischer Titel: aus GPT oder aus erstem Satz fallback
-    title = data.get("title")
-    if not title:
-        title = text.split(".")[0][:50]
+    # 📌 Titel dynamisch aus dem ersten Satz (max. 50 Zeichen)
+    title_text = text.strip().split(".")[0][:50]
 
     headers = {
         "Authorization": f"Bearer {NOTION_API_KEY}",
@@ -31,12 +29,12 @@ def save_entry():
     }
 
     payload = {
-        "parent": {"database_id": NOTION_DATABASE_ID},
+        "parent": { "database_id": NOTION_DATABASE_ID },
         "properties": {
             "Titel": {
                 "title": [{
                     "text": {
-                        "content": title
+                        "content": title_text or "GPT Journal Entry"
                     }
                 }]
             },
@@ -53,7 +51,7 @@ def save_entry():
             "paragraph": {
                 "rich_text": [{
                     "type": "text",
-                    "text": {"content": text}
+                    "text": { "content": text }
                 }]
             }
         }]
