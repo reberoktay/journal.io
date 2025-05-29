@@ -7,10 +7,10 @@ app = Flask(__name__)
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 
-# 🔄 Einträge aus Notion abrufen – mit Debug-Ausgabe
+# === Einträge flexibel lesen ===
 @app.route("/read_entries", methods=["GET"])
 def read_entries():
-    limit = int(request.args.get("limit", 5))  # Standard = 5
+    limit = int(request.args.get("limit", 5))  # Default = 5
     headers = {
         "Authorization": f"Bearer {NOTION_API_KEY}",
         "Notion-Version": "2022-06-28",
@@ -33,7 +33,7 @@ def read_entries():
         json=payload
     )
 
-    # 🔍 Debug-Ausgabe für Logs (zur Fehleranalyse)
+    # Debugging: Gib Status und Inhalt der Notion-Antwort aus!
     print("NOTION RESPONSE STATUS:", response.status_code)
     print("NOTION RESPONSE TEXT:", response.text)
 
@@ -44,20 +44,26 @@ def read_entries():
     entries = []
 
     for result in results:
-        entry_text = ""
-        if "properties" in result:
-            props = result["properties"]
-            for key, prop in props.items():
-                if prop.get("type") == "title":
-                    entry_text += " ".join(t.get("plain_text", "") for t in prop.get("title", [])) + "\n"
-                elif prop.get("type") == "rich_text":
-                    entry_text += " ".join(t.get("plain_text", "") for t in prop.get("rich_text", [])) + "\n"
-        entries.append(entry_text.strip())
+        entry = {}
+        # Titel, Datum und Bewertung abrufen, falls vorhanden:
+        props = result.get("properties", {})
+        # Titel
+        title_data = props.get("Titel", {}).get("title", [])
+        entry["title"] = title_data[0]["plain_text"] if title_data else ""
+        # Datum
+        date_data = props.get("Datum", {}).get("date", {})
+        entry["date"] = date_data.get("start", "")
+        # Bewertung
+        rating_data = props.get("Bewertung", {}).get("number", None)
+        entry["rating"] = rating_data if rating_data is not None else ""
+        # Optional: KI-Zusammenfassung, falls du sie als property hast:
+        summary_data = props.get("KI-Zusammenfassung", {}).get("rich_text", [])
+        entry["summary"] = summary_data[0]["plain_text"] if summary_data else ""
+        entries.append(entry)
 
     return jsonify({"entries": entries}), 200
 
-
-# 📝 GPT-Journaleintrag in Notion speichern
+# === Eintrag speichern ===
 @app.route("/save", methods=["POST"])
 def save_entry():
     data = request.get_json()
@@ -98,13 +104,13 @@ def save_entry():
     }
 
     response = requests.post("https://api.notion.com/v1/pages", headers=headers, json=payload)
+    print("NOTION SAVE RESPONSE STATUS:", response.status_code)
+    print("NOTION SAVE RESPONSE TEXT:", response.text)
 
     if response.status_code in [200, 201]:
         return jsonify({"message": "Saved to Notion!"}), 200
     else:
         return jsonify({"error": "Failed"}), 500
 
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
-
