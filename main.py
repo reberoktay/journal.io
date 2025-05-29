@@ -1,20 +1,19 @@
 from flask import Flask, request, jsonify
 import os
 import requests
-from datetime import datetime
+import datetime
 import time
-import json
 
 app = Flask(__name__)
 
-# Notion-Zugangsdaten aus Umgebungsvariablen
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 
-# 🔁 Einträge aus Notion abrufen (echter Seiteninhalt)
+# 🔄 Einträge aus Notion lesen (Child Blocks)
 @app.route("/read_entries", methods=["GET"])
 def read_entries():
-    limit = int(request.args.get("limit", 5))  # Standard: 5 Einträge
+    limit = int(request.args.get("limit", 5))
+
     headers = {
         "Authorization": f"Bearer {NOTION_API_KEY}",
         "Notion-Version": "2022-06-28",
@@ -38,48 +37,49 @@ def read_entries():
     )
 
     if query_response.status_code != 200:
-        print("Fehler bei der Abfrage der Datenbank:", query_response.text)
+        print("❌ Fehler beim Query:", query_response.text)
         return jsonify({"error": "Failed to query Notion"}), 500
 
-    pages = query_response.json().get("results", [])
+    results = query_response.json().get("results", [])
     entries = []
 
-    for page in pages:
-        page_id = page["id"]
+    for result in results:
+        page_id = result.get("id")
         blocks_url = f"https://api.notion.com/v1/blocks/{page_id}/children"
         block_response = requests.get(blocks_url, headers=headers)
 
         if block_response.status_code != 200:
-            print(f"Fehler beim Laden der Page-Blocks: {page_id}")
-            entries.append("[Fehler beim Laden dieses Eintrags]")
+            print(f"❌ Fehler bei Page {page_id}:", block_response.text)
+            entries.append("[Fehler beim Laden]")
             continue
 
         blocks = block_response.json().get("results", [])
-        text_parts = []
+        content = []
 
         for block in blocks:
-            if block.get("type") == "paragraph":
-                for rich in block["paragraph"].get("rich_text", []):
-                    text_parts.append(rich.get("plain_text", ""))
+            block_type = block.get("type")
+            if block_type and "text" in block.get(block_type, {}):
+                for t in block[block_type].get("text", []):
+                    content.append(t.get("plain_text", ""))
 
-        entry_text = "\n".join(text_parts).strip()
-        entries.append(entry_text if entry_text else "[Leer]")
-
-        time.sleep(0.2)  # Respektiere Rate-Limits
+        full_text = "\n".join(content).strip()
+        entries.append(full_text or "[Leer]")
+        time.sleep(0.1)
 
     return jsonify({"entries": entries}), 200
 
-# ✅ Eintrag in Notion speichern
+
+# ✅ Eintrag in Notion speichern (inkl. Bewertung & Datum)
 @app.route("/save", methods=["POST"])
 def save_entry():
     data = request.get_json()
     text = data.get("text")
-    rating = data.get("rating", 7)  # Optionaler Rating-Wert
+    rating = data.get("rating", 7)
 
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.date.today().isoformat()
 
     headers = {
         "Authorization": f"Bearer {NOTION_API_KEY}",
@@ -125,8 +125,8 @@ def save_entry():
     if response.status_code in [200, 201]:
         return jsonify({"message": "Saved to Notion!"}), 200
     else:
-        print("Fehler beim Speichern:", response.text)
-        return jsonify({"error": "Failed to save to Notion"}), 500
+        print("❌ Fehler beim Speichern:", response.text)
+        return jsonify({"error": "Failed"}), 500
 
 
 if __name__ == "__main__":
