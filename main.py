@@ -67,3 +67,59 @@ def save_entry():
             "status": response.status_code,
             "response": response.text
         }), 500
+
+# 📤 Journaleinträge lesen
+@app.route("/read_entries", methods=["GET"])
+def read_entries():
+    limit = int(request.args.get("limit", 5))
+
+    headers = {
+        "Authorization": f"Bearer {NOTION_API_KEY}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "page_size": limit,
+        "sorts": [{
+            "property": "Datum",
+            "direction": "descending"
+        }]
+    }
+
+    query_response = requests.post(
+        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
+        headers=headers,
+        json=payload
+    )
+
+    if query_response.status_code != 200:
+        return jsonify({
+            "error": "Failed to query Notion",
+            "status": query_response.status_code,
+            "response": query_response.text
+        }), 500
+
+    results = query_response.json().get("results", [])
+    entries = []
+
+    for result in results:
+        # Inhalte aus der Seite lesen
+        page_id = result["id"]
+        blocks_response = requests.get(
+            f"https://api.notion.com/v1/blocks/{page_id}/children",
+            headers=headers
+        )
+        if blocks_response.status_code == 200:
+            blocks = blocks_response.json().get("results", [])
+            text_content = []
+            for block in blocks:
+                if block["type"] == "paragraph":
+                    for rich_text in block["paragraph"]["rich_text"]:
+                        text_content.append(rich_text.get("plain_text", ""))
+            entries.append(" ".join(text_content).strip())
+
+    return jsonify({"entries": entries}), 200
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=3000)
